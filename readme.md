@@ -10,7 +10,7 @@ https://en.wikipedia.org/wiki/Binary_expression_tree
 
 ### Алгоритм преобразования строки математического выражения в бинарное дерево.
 
-![Binary expression tree](btree.svg)
+![Binary expression tree](pictures/btree.svg)
 
 1. Пронумеровать все символы. 
 2. Каждому оператору присвоить приоритет.
