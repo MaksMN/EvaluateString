@@ -10,7 +10,7 @@
 #include <cctype>
 #include <sstream> 
 
-template <typename T, typename TB = int>
+template <typename T = double, typename TB = long long int>
 class EvaluateString
 {
 private:
@@ -92,12 +92,18 @@ private:
 
     struct operand : public node
     {
-        operand(T* value) : value_(value) {}
+        operand(T* value, bool* bind_var) : value_(value), const_value(0), bind(bind_var) {}
+        operand(T value) : const_value(value), value_(&const_value), bind(&const_bind) {}
     private:
-        T* value_ = 0;
+        bool const_bind = true;
+        bool* bind = nullptr;
+        const T const_value;
+        const T* value_;
     public:
         T calculate() override
         {
+            if (bind != nullptr && !*bind)
+                throw std::runtime_error("Variable not bound");
             return *value_;
         }
         void add(std::unique_ptr<node> n)  override {}
@@ -107,7 +113,7 @@ private:
 
     struct node_logical_or final : public node_operator
     {
-        node_logical_or(int increase = 0) : node_operator(1 + increase) {}
+        node_logical_or() : node_operator(1) {}
         T calculate() override
         {
             return this->getLeftValue() || this->getRightValue();
@@ -116,7 +122,7 @@ private:
 
     struct node_logical_and final : public node_operator
     {
-        node_logical_and(int increase = 0) : node_operator(2 + increase) {}
+        node_logical_and() : node_operator(2) {}
         T calculate() override
         {
             return this->getLeftValue() && this->getRightValue();
@@ -125,7 +131,7 @@ private:
 
     struct node_bitwise_or final : public node_operator
     {
-        node_bitwise_or(int increase = 0) : node_operator(3 + increase) {}
+        node_bitwise_or() : node_operator(3) {}
         T calculate() override
         {
             return (TB)this->getLeftValue() | (TB)this->getRightValue();
@@ -134,7 +140,7 @@ private:
 
     struct node_bitwise_xor final : public node_operator
     {
-        node_bitwise_xor(int increase = 0) : node_operator(4 + increase) {}
+        node_bitwise_xor() : node_operator(4) {}
         T calculate() override
         {
             return (TB)this->getLeftValue() ^ (TB)this->getRightValue();
@@ -143,7 +149,7 @@ private:
 
     struct node_bitwise_and final : public node_operator
     {
-        node_bitwise_and(int increase = 0) : node_operator(5 + increase) {}
+        node_bitwise_and() : node_operator(5) {}
         T calculate() override
         {
             return (TB)this->getLeftValue() & (TB)this->getRightValue();
@@ -152,7 +158,7 @@ private:
 
     struct node_equal final : public node_operator
     {
-        node_equal(int increase = 0) : node_operator(6 + increase) {}
+        node_equal() : node_operator(6) {}
         T calculate() override
         {
             return this->getLeftValue() == this->getRightValue();
@@ -161,7 +167,7 @@ private:
 
     struct node_not_equal final : public node_operator
     {
-        node_not_equal(int increase = 0) : node_operator(6 + increase) {}
+        node_not_equal() : node_operator(6) {}
         T calculate() override
         {
             return this->getLeftValue() != this->getRightValue();
@@ -170,7 +176,7 @@ private:
 
     struct node_less final : public node_operator
     {
-        node_less(int increase = 0) : node_operator(7 + increase) {}
+        node_less() : node_operator(7) {}
         T calculate() override
         {
             return this->getLeftValue() < this->getRightValue();
@@ -179,7 +185,7 @@ private:
 
     struct node_less_equal final : public node_operator
     {
-        node_less_equal(int increase = 0) : node_operator(7 + increase) {}
+        node_less_equal() : node_operator(7) {}
         T calculate() override
         {
             return this->getLeftValue() <= this->getRightValue();
@@ -188,7 +194,7 @@ private:
 
     struct node_greater final : public node_operator
     {
-        node_greater(int increase = 0) : node_operator(7 + increase) {}
+        node_greater() : node_operator(7) {}
         T calculate() override
         {
             return this->getLeftValue() > this->getRightValue();
@@ -197,7 +203,7 @@ private:
 
     struct node_greater_equal final : public node_operator
     {
-        node_greater_equal(int increase = 0) : node_operator(7 + increase) {}
+        node_greater_equal() : node_operator(7) {}
         T calculate() override
         {
             return this->getLeftValue() >= this->getRightValue();
@@ -206,7 +212,7 @@ private:
 
     struct node_bitwise_left_shift final : public node_operator
     {
-        node_bitwise_left_shift(int increase = 0) : node_operator(8 + increase) {}
+        node_bitwise_left_shift() : node_operator(8) {}
         T calculate() override
         {
             return (TB)this->getLeftValue() << (TB)this->getRightValue();
@@ -215,7 +221,7 @@ private:
 
     struct node_bitwise_right_shift final : public node_operator
     {
-        node_bitwise_right_shift(int increase = 0) : node_operator(8 + increase) {}
+        node_bitwise_right_shift() : node_operator(8) {}
         T calculate() override
         {
             return (TB)this->getLeftValue() >> (TB)this->getRightValue();
@@ -224,7 +230,7 @@ private:
 
     struct node_addition final : public node_operator
     {
-        node_addition(int increase = 0) : node_operator(9 + increase) {}
+        node_addition() : node_operator(9) {}
         T calculate() override
         {
             return this->getLeftValue() + this->getRightValue();
@@ -233,7 +239,7 @@ private:
 
     struct node_subtraction final : public node_operator
     {
-        node_subtraction(int increase = 0) : node_operator(9 + increase) {}
+        node_subtraction() : node_operator(9) {}
         T calculate() override
         {
             return this->getLeftValue() - this->getRightValue();
@@ -242,7 +248,7 @@ private:
 
     struct node_multiplication final : public node_operator
     {
-        node_multiplication(int increase = 0) : node_operator(10 + increase) {}
+        node_multiplication() : node_operator(10) {}
         T calculate() override
         {
             auto v1 = this->getLeftValue();
@@ -253,7 +259,7 @@ private:
 
     struct node_division final : public node_operator
     {
-        node_division(int increase = 0) : node_operator(10 + increase) {}
+        node_division() : node_operator(10) {}
         T calculate() override
         {
             auto v1 = this->getLeftValue();
@@ -269,7 +275,7 @@ private:
 
     struct node_remainder final : public node_operator
     {
-        node_remainder(int increase = 0) : node_operator(10 + increase) {}
+        node_remainder() : node_operator(10) {}
         T calculate() override
         {
             return (TB)this->getLeftValue() % (TB)this->getRightValue();
@@ -278,7 +284,7 @@ private:
 
     struct node_prefix_minus final : public node_operator
     {
-        node_prefix_minus(int increase = 0) : node_operator(11 + increase) {}
+        node_prefix_minus() : node_operator(11) {}
         T calculate() override
         {
             return -(this->getRightValue());
@@ -287,7 +293,7 @@ private:
 
     struct node_prefix_bitwise_not final : public node_operator
     {
-        node_prefix_bitwise_not(int increase = 0) : node_operator(11 + increase) {}
+        node_prefix_bitwise_not() : node_operator(11) {}
         T calculate() override
         {
             return ~(TB)(this->getRightValue());
@@ -302,8 +308,8 @@ private:
     std::stack<std::unique_ptr<node>> common_stack;
     const std::string expression;
 
-    std::vector<T> vars;
     std::map<std::string, T> m_vars;
+    std::map<std::string, bool> bind_vars;
 
     // символы которые в исходной строке разрешаются как операторы
     const std::set<char> operator_chars = { '~', '!', '%', '^', '&', '=', '|', '<', '>', '/', '*', '-', '+' };
@@ -338,7 +344,7 @@ private:
     }
 
     bool isVariable(const char ch) {
-        return isalnum(ch) || ch == '_';
+        return isalnum(ch) || ch == '_' || ch == '.' || ch == ',';
     }
 
     bool isBracket(const char ch) {
@@ -356,7 +362,9 @@ private:
     }
 
     // преобразует строку в тип Т. При неудаче возвращает nullptr
-    std::unique_ptr<T> convertString(const std::string& str) {
+    std::unique_ptr<T> convertString(std::string& str)
+    {
+        str = str_replace(",", ".", str);
         std::istringstream iss(str);
         T value;
         iss >> value;
@@ -396,6 +404,9 @@ private:
     std::queue<std::unique_ptr<Token>> tokens;
 
     void createTree() {
+        if (common_stack.empty()) {
+            throw std::runtime_error("Bad expression");
+        }
         root = std::move(common_stack.top());
         common_stack.pop();
         while (!common_stack.empty())
@@ -416,12 +427,6 @@ private:
             i++;
             tokens.pop();
 
-            while (tokens.empty() && !operators_stack.empty())
-            {
-                common_stack.push(std::move(operators_stack.top()));
-                operators_stack.pop();
-            }
-
             if (t->value == "(")
             {
                 increase += 100;
@@ -434,7 +439,15 @@ private:
             }
 
             if (t->type_ == TokenType::variables) {
-                auto v = std::make_unique<operand>(&m_vars[t->value]);
+                auto var = convertString(t->value);
+                std::unique_ptr<operand> v = nullptr;
+                if (var)
+                    v = std::make_unique<operand>(*var);
+                else
+                {
+                    bind_vars[t->value] = false;
+                    v = std::make_unique<operand>(&m_vars[t->value], &bind_vars[t->value]);
+                }
                 v->index = i;
                 common_stack.push(std::move(v));
                 continue;
@@ -442,6 +455,8 @@ private:
 
             if (t->type_ == TokenType::operators) {
                 auto op = std::move(createOperator(t->value));
+                if (!op)
+                    throw std::runtime_error("Expression wrong");
                 op->index = i;
                 op->increasePriority(increase);
 
@@ -459,6 +474,12 @@ private:
                 }
             }
         }
+
+        while (!operators_stack.empty())
+        {
+            common_stack.push(std::move(operators_stack.top()));
+            operators_stack.pop();
+        }
     }
 
     void createTokens() {
@@ -466,7 +487,8 @@ private:
         std::stack<char> bracketsStack;
         bool imbalance = false;
 
-        for (char c : expression) {
+        for (int i = 0; i < expression.size(); ++i) {
+            char c = expression[i];
             if (c == ' ')
                 continue;
 
@@ -494,6 +516,10 @@ private:
             {
                 token->value += c;
                 token->type_ = TokenType::variables;
+                if (i == expression.size() - 1) {
+                    tokens.push(std::move(token));
+                    break;
+                }
                 continue;
             }
 
@@ -549,6 +575,31 @@ private:
             throw std::runtime_error(error_message);
         }
     }
+    // Функция str_replace для замены подстроки в строке
+    std::string str_replace(const std::string& search, const std::string& replace, const std::string& subject) {
+        std::string result = subject;
+        size_t pos = 0;
+
+        while ((pos = result.find(search, pos)) != std::string::npos) {
+            result.replace(pos, search.length(), replace);
+            pos += replace.length();  // сдвигаем позицию для дальнейшего поиска
+        }
+
+        return result;
+    }
+
+    std::string apply_replacements(const std::map<std::string, T>& replacements, const std::string& subject) {
+        std::string result = subject;
+
+        // Проходим по каждому элементу словаря (ключ - строка для поиска, значение - для замены)
+        for (const auto& pair : replacements) {
+            std::string search = pair.first;
+            std::string replace = std::to_string(pair.second);
+            result = str_replace(search, replace, result);  // применяем str_replace для каждого элемента
+        }
+
+        return result;
+    }
 
 public:
     EvaluateString(const std::string& exp) : expression(exp)
@@ -558,9 +609,26 @@ public:
         createTree();
     }
 
-    void bindVar(const std::string& key, T value);
+    void bindVar(const std::string& key, T value)
+    {
+        auto a = &m_vars[key];
+        auto it = m_vars.find(key);
+        if (it != m_vars.end()) {
+            it->second = value;
+            bind_vars[key] = true;
+        }
+        else {
+            throw std::runtime_error("There is no variable with this name");
+        }
+    }
 
-    T calculate();
+    std::string getExpression() {
+        return apply_replacements(m_vars, expression);
+    }
+
+    T calculate() {
+        return root->calculate();
+    }
 
 };
 
