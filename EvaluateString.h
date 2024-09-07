@@ -9,13 +9,17 @@
 #include <queue>
 #include <cctype>
 #include <sstream> 
+#include <iomanip>
 
+/// @brief Анализ строки арифметического выражения
+/// @tparam T тип для основных арифметических операций
+/// @tparam TB Тип в который преобразуется T в битовых операциях. Должен быть целочисленным
 template <typename T = double, typename TB = long long int>
 class EvaluateString
 {
 private:
-
-    // базовая структура
+#pragma region Base structures
+    /// @brief Базовая структура узла дерева
     struct node
     {
         int index = 0;
@@ -23,7 +27,7 @@ private:
         virtual void add(std::unique_ptr<node> n) = 0;
     };
 
-    // структура оператора
+    /// @brief Базовая структура операторов
     struct node_operator : public node
     {
     protected:
@@ -90,6 +94,7 @@ private:
         }
     };
 
+    /// @brief Структура операнда
     struct operand : public node
     {
         operand(T* value, bool* bind_var) : value_(value), const_value(0), bind(bind_var) {}
@@ -108,8 +113,11 @@ private:
         }
         void add(std::unique_ptr<node> n)  override {}
     };
+#pragma endregion
 
 #pragma region operators
+
+    // Структуры операторов
 
     struct node_logical_or final : public node_operator
     {
@@ -302,19 +310,26 @@ private:
 
 #pragma endregion
 
+    // Вершина дерева
     std::unique_ptr<node> root = nullptr;
-
+    // Стек операторов
     std::stack<std::unique_ptr<node_operator>> operators_stack;
+    // Основной стек
     std::stack<std::unique_ptr<node>> common_stack;
+    // Строка выражения
     const std::string expression;
 
+    // Карта переменных выражения
     std::map<std::string, T> m_vars;
+    // Карта инициализированных переменных выражения
     std::map<std::string, bool> bind_vars;
 
-    // символы которые в исходной строке разрешаются как операторы
+    // Символы которые в исходной строке разрешаются как операторы
     const std::set<char> operator_chars = { '~', '!', '%', '^', '&', '=', '|', '<', '>', '/', '*', '-', '+' };
+    // Символы которые в исходной строке разрешаются как многосимвольные операторы
     const std::set<std::string> operators_str = { "||", "&&", "==", "!=", "<=", ">=", "<<", ">>" };
 
+    // Карта для создания узлов операторов
     const std::map<std::string, std::function<node_operator* ()>> registry_operators
     {
         { "||", []() -> node_operator* { return new node_logical_or(); } },
@@ -335,9 +350,18 @@ private:
         { "*", []() -> node_operator* { return new node_multiplication(); } },
         { "/", []() -> node_operator* { return new node_division(); } },
         { "%", []() -> node_operator* { return new node_remainder(); } },
-        //{ "-'", []() -> node* { return new node_prefix_minus(); } },
         { "~", []() -> node_operator* { return new node_prefix_bitwise_not(); } },
     };
+
+    // создает узел оператора
+    std::unique_ptr<node_operator> createOperator(const std::string& key)
+    {
+        auto it = registry_operators.find(key);
+        if (it != registry_operators.end()) {
+            return std::unique_ptr<node_operator>((it->second)());
+        }
+        return nullptr;
+    }
 
     bool isOperator(const char ch) {
         return operator_chars.contains(ch);
@@ -351,48 +375,13 @@ private:
         return ch == '(' || ch == ')';
     }
 
-    // создает узел оператора
-    std::unique_ptr<node_operator> createOperator(const std::string& key)
-    {
-        auto it = registry_operators.find(key);
-        if (it != registry_operators.end()) {
-            return std::unique_ptr<node_operator>((it->second)());
-        }
-        return nullptr;
-    }
-
-    // преобразует строку в тип Т. При неудаче возвращает nullptr
-    std::unique_ptr<T> convertString(std::string& str)
-    {
-        str = str_replace(",", ".", str);
-        std::istringstream iss(str);
-        T value;
-        iss >> value;
-        if (!iss.fail() && iss.eof()) {
-            return std::make_unique<T>(value);
-        }
-        else {
-            return nullptr;
-        }
-    }
-
+#pragma region Tokens actions
     enum TokenType {
         operators,
         variables,
         brackets,
         no_init
     };
-
-    TokenType getTokenType(const char ch) {
-        if (isVariable(ch))
-            return TokenType::variables;
-        if (isOperator(ch))
-            return TokenType::operators;
-        if (ch == '(' || ch == ')')
-            return TokenType::brackets;
-        return TokenType::no_init;
-    }
-
     struct Token
     {
         std::string value;
@@ -402,86 +391,15 @@ private:
         }
     };
     std::queue<std::unique_ptr<Token>> tokens;
-
-    void createTree() {
-        if (common_stack.empty()) {
-            throw std::runtime_error("Bad expression");
-        }
-        root = std::move(common_stack.top());
-        common_stack.pop();
-        while (!common_stack.empty())
-        {
-            root->add(std::move(common_stack.top()));
-            common_stack.pop();
-        }
-        int s = 0;
+    TokenType getTokenType(const char ch) {
+        if (isVariable(ch))
+            return TokenType::variables;
+        if (isOperator(ch))
+            return TokenType::operators;
+        if (ch == '(' || ch == ')')
+            return TokenType::brackets;
+        return TokenType::no_init;
     }
-
-    void createStack() {
-
-        int increase = 0;
-        int i = 0;
-        while (!tokens.empty())
-        {
-            auto t = std::move(tokens.front());
-            i++;
-            tokens.pop();
-
-            if (t->value == "(")
-            {
-                increase += 100;
-                continue;
-            }
-            if (t->value == ")")
-            {
-                increase -= 100;
-                continue;
-            }
-
-            if (t->type_ == TokenType::variables) {
-                auto var = convertString(t->value);
-                std::unique_ptr<operand> v = nullptr;
-                if (var)
-                    v = std::make_unique<operand>(*var);
-                else
-                {
-                    bind_vars[t->value] = false;
-                    v = std::make_unique<operand>(&m_vars[t->value], &bind_vars[t->value]);
-                }
-                v->index = i;
-                common_stack.push(std::move(v));
-                continue;
-            }
-
-            if (t->type_ == TokenType::operators) {
-                auto op = std::move(createOperator(t->value));
-                if (!op)
-                    throw std::runtime_error("Expression wrong");
-                op->index = i;
-                op->increasePriority(increase);
-
-                while (!operators_stack.empty() && op->getPriority() <= operators_stack.top()->getPriority()) {
-                    common_stack.push(std::move(operators_stack.top()));
-                    operators_stack.pop();
-                }
-                if (operators_stack.empty()) {
-                    operators_stack.push(std::move(op));
-                    continue;
-                }
-                if (op->getPriority() > operators_stack.top()->getPriority()) {
-                    operators_stack.push(std::move(op));
-                    continue;
-                }
-            }
-        }
-
-        while (!operators_stack.empty())
-        {
-            common_stack.push(std::move(operators_stack.top()));
-            operators_stack.pop();
-        }
-    }
-
     void createTokens() {
         std::unique_ptr<Token> token;
         std::stack<char> bracketsStack;
@@ -575,6 +493,106 @@ private:
             throw std::runtime_error(error_message);
         }
     }
+#pragma endregion
+
+    // Создает стек операций
+    void createStack() {
+
+        int increase = 0;
+        int i = 0;
+        while (!tokens.empty())
+        {
+            auto t = std::move(tokens.front());
+            i++;
+            tokens.pop();
+
+            if (t->value == "(")
+            {
+                increase += 100;
+                continue;
+            }
+            if (t->value == ")")
+            {
+                increase -= 100;
+                continue;
+            }
+
+            if (t->type_ == TokenType::variables) {
+                auto var = convertString(t->value);
+                std::unique_ptr<operand> v = nullptr;
+                if (var)
+                    v = std::make_unique<operand>(*var);
+                else
+                {
+                    bind_vars[t->value] = false;
+                    v = std::make_unique<operand>(&m_vars[t->value], &bind_vars[t->value]);
+                }
+                v->index = i;
+                common_stack.push(std::move(v));
+                continue;
+            }
+
+            if (t->type_ == TokenType::operators) {
+                auto op = std::move(createOperator(t->value));
+                if (!op)
+                    throw std::runtime_error("Expression wrong");
+                op->index = i;
+                op->increasePriority(increase);
+
+                while (!operators_stack.empty() && op->getPriority() <= operators_stack.top()->getPriority()) {
+                    common_stack.push(std::move(operators_stack.top()));
+                    operators_stack.pop();
+                }
+                if (operators_stack.empty()) {
+                    operators_stack.push(std::move(op));
+                    continue;
+                }
+                if (op->getPriority() > operators_stack.top()->getPriority()) {
+                    operators_stack.push(std::move(op));
+                    continue;
+                }
+            }
+        }
+
+        while (!operators_stack.empty())
+        {
+            common_stack.push(std::move(operators_stack.top()));
+            operators_stack.pop();
+        }
+    }
+
+    // Создает дерево выражений
+    void createTree() {
+        if (common_stack.empty()) {
+            throw std::runtime_error("Bad expression");
+        }
+        root = std::move(common_stack.top());
+        common_stack.pop();
+        while (!common_stack.empty())
+        {
+            root->add(std::move(common_stack.top()));
+            common_stack.pop();
+        }
+        int s = 0;
+    }
+
+    // Функции общего назначения
+
+    // Преобразует строку в тип Т. При неудаче возвращает nullptr
+    std::unique_ptr<T> convertString(std::string& str)
+    {
+        str = str_replace(",", ".", str);
+        std::istringstream iss(str);
+        T value;
+        iss >> value;
+        if (!iss.fail() && iss.eof()) {
+            return std::make_unique<T>(value);
+        }
+        else {
+            return nullptr;
+        }
+    }
+
     // Функция str_replace для замены подстроки в строке
     std::string str_replace(const std::string& search, const std::string& replace, const std::string& subject) {
         std::string result = subject;
@@ -588,19 +606,37 @@ private:
         return result;
     }
 
+    // Перезаписывает в строке символы по шаблону карты <string, T>, меняет string на T
     std::string apply_replacements(const std::map<std::string, T>& replacements, const std::string& subject) {
         std::string result = subject;
 
-        // Проходим по каждому элементу словаря (ключ - строка для поиска, значение - для замены)
         for (const auto& pair : replacements) {
             std::string search = pair.first;
-            std::string replace = std::to_string(pair.second);
-            result = str_replace(search, replace, result);  // применяем str_replace для каждого элемента
+            std::string replace = to_string(pair.second);
+            result = str_replace(search, replace, result);
         }
 
         return result;
     }
 
+    // преобразует T в строку удаляя лишние нули в дробной части
+    std::string to_string(T value) {
+        std::ostringstream oss;
+        // Устанавливаем формат вывода: фиксированное количество знаков после запятой, но без лишних нулей
+        oss << std::fixed << std::setprecision(10) << value;
+
+        std::string str = oss.str();
+
+        // Убираем лишние нули в конце дробной части
+        str.erase(str.find_last_not_of('0') + 1, std::string::npos);
+
+        // Если число заканчивается на точку, убираем ее
+        if (str.back() == '.') {
+            str.pop_back();
+        }
+
+        return str;
+    }
 public:
     EvaluateString(const std::string& exp) : expression(exp)
     {
